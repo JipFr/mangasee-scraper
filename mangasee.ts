@@ -3,22 +3,16 @@
 interface PageInfo {
 	/** Relevant chapter to page, 0-indexed */
 	chapter: number;
-	/** Page number, 1-indexed */
-	page: number;
 }
 
 /** This is what getPageSrc will return */
 export interface Page {
-	/** Source of image to page in chapter */
-	src?: string;
+	/** Sources of images in chapter */
+	sources: string[];
 	/** Array of numbers mapping the chapters */
 	chapters?: number[];
 	/** Array of numbers mapping the pages */
 	pages?: number[];
-	/** Next page */
-	next: PageInfo | null;
-	/** Previous page */
-	previous: PageInfo | null;
 	/** Current page */
 	current: PageInfo;
 }
@@ -45,68 +39,32 @@ function getOptionValues(pageHTML: string, className: string): number[] {
 /**
  * Get a URL to an image
  * @param rootUrl Root URL for manga with %slug%. e.g "https://mangaseeonline.us/read-online/%slug%.html"
- * @param slug Slug for page, including %chapter% and %page%, e.g: Fire-Brigade-Of-Flames-chapter-%chapter%-page-%page%
+ * @param slug Slug for page, including %chapter%, e.g: Fire-Brigade-Of-Flames-chapter-%chapter%
  * @param chapter Chapter number, 0-indexed
  * @param page Chapter page, 1-indexed
  */
-async function getPageSrc(rootUrl: string, slug: string, chapter: number, page: number): Promise<Page> {
+async function getPageSrc(rootUrl: string, slug: string, chapter: number): Promise<Page> {
 	// Generate URL
 	let url = rootUrl.replace(/%slug%/g, slug)
 	  .replace(/%chapter%/g, chapter.toString())
-	  .replace(/%page%/g, page.toString());
 
 	// Get HTML from page
 	let pageHTML = await (await fetch(url)).text();
 
 	// Extract source from page
-	let src = pageHTML.match(/img class="CurImage nextBtn" src="(.+)"/);
-	
-	// Get pages in array format
-	let pages = getOptionValues(pageHTML, "input-xs PageSelect");
+	let sources = (pageHTML.match(/<div class=("|')fullchapimage("|')><img src="[a-z|A-Z|:|\/|\d|\.|-]+"><\/div>/g) ?? []).map(match => {
+		let url = match.match(/<img src="([a-z|A-Z|:|\/|\d|\.|-]+)">/);
+		return url ? url[1]: "";
+	}).filter(Boolean);
 
 	// Get chapters in array format
 	let chapters = getOptionValues(pageHTML, "input-xs ChapterSelect");
 
-	// Get next page
-	let next: PageInfo | null = null;
-	if(pages.includes(page + 1)) {
-		// Next page is in same chapter
-		next = {
-			chapter,
-			page: page + 1
-		}
-	} else if(chapters.includes(chapter + 1)) {
-		// Next page is in next chapter
-		next = {
-			chapter: chapter + 1,
-			page: 1
-		}
-	}
-
-	// Get previous page
-	let previous: PageInfo | null = null;
-	if(pages.includes(page - 1)) {
-		// Previous page is in same chapter
-		previous = {
-			chapter,
-			page: page - 1
-		}
-	} else if(chapters.includes(chapter + 1)) {
-		// Previous page is in the previous chapter
-		previous = {
-			chapter: chapter - 1,
-			page: -1 // ¯\_(ツ)_/¯
-		}
-	}
-
 	// Current page and chapter
-	let current = { chapter, page };
+	let current = { chapter };
 
 	// Return value
-	let returning: Page = { next, previous, current }
-	if(src) returning.src = src[1];
-	if(pages) returning.pages = pages;
-	if(chapters) returning.chapters = chapters;
+	let returning: Page = { current, sources, chapters }
 
 	return returning;
 }
