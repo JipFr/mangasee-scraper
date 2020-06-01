@@ -8,7 +8,7 @@ interface PageInfo {
 }
 
 /** This is what getPageSrc will return */
-interface Page {
+export interface Page {
 	/** Source of image to page in chapter */
 	src?: string;
 	/** Array of numbers mapping the chapters */
@@ -19,6 +19,8 @@ interface Page {
 	next: PageInfo | null;
 	/** Previous page */
 	previous: PageInfo | null;
+	/** Current page */
+	current: PageInfo;
 }
 
 /**
@@ -28,9 +30,12 @@ interface Page {
  */
 function getOptionValues(pageHTML: string, className: string): number[] {
 	let optionStr = pageHTML.split(`<select class="${className}">`)[1].split("</select>")[0];
-	let arr = (optionStr.match(/option value=("|')\d+("|')>.{0,20} (\d+)<\/option>/g) ?? []);
-	let values: number[] = arr.map((p: string) => {
+	// Get matches for option elements
+	let optionMatches = (optionStr.match(/option value=("|')\d+("|')( selected)?>.{0,20} (\d+)<\/option>/g) ?? []);
+	// Map option elements to their values
+	let values: number[] = optionMatches.map((p: string) => {
 		let m = p.match(/\d+/g);
+		// 1 or 0 because chapters only show the proper values in text
 		if(m) return Number(m[1] ?? m[0]);
 		return 0;
 	});
@@ -94,8 +99,11 @@ async function getPageSrc(rootUrl: string, slug: string, chapter: number, page: 
 		}
 	}
 
+	// Current page and chapter
+	let current = { chapter, page };
+
 	// Return value
-	let returning: Page = { next, previous }
+	let returning: Page = { next, previous, current }
 	if(src) returning.src = src[1];
 	if(pages) returning.pages = pages;
 	if(chapters) returning.chapters = chapters;
